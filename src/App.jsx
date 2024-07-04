@@ -1,43 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Navbar from './components/navbar';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { ProgressBar } from 'react-bootstrap';
-import axios from 'axios';
 
 function App() {
-  const [count, setCount] = useState(0);
   const [Todo, setTodo] = useState("");  // Task input
   const [Todos, setTodos] = useState([]); // Array of tasks
-  const [editing, setEditing] = useState(null); // Track which task is being edited
-  const [editText, setEditText] = useState(""); // Track the edited text
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
-    const response = await axios.get('http://localhost:3000/api/tasks');
-    setTodos(response.data);
+  const HandleEdit = (index) => {
+    const updatedTodos = Todos.map((todo, idx) => {
+      if (idx === index) {
+        return { ...todo, editing: !todo.editing }; // Toggle editing mode
+      }
+      return todo;
+    });
+    setTodos(updatedTodos);
   };
 
-  const HandleEdit = async (index) => {
-    const updatedTask = { ...Todos[index], name: editText };
-    await axios.put(`http://localhost:3000/api/tasks/${Todos[index]._id}`, updatedTask);
-    setEditing(null);
-    setEditText("");
-    fetchTasks();
+  const HandleDelete = (index) => {
+    const newTodos = Todos.filter((_, idx) => idx !== index);
+    setTodos(newTodos);
   };
 
-  const HandleDelete = async (index) => {
-    await axios.delete(`http://localhost:3000/api/tasks/${Todos[index]._id}`);
-    fetchTasks();
-  };
-
-  const HandleAdd = async () => {
+  const HandleAdd = () => {
     if (Todo.trim()) {
-      await axios.post('http://localhost:3000/api/tasks', { name: Todo, isCompleted: false });
+      setTodos([...Todos, { Todo, isCompleted: false, editing: false }]);
       setTodo(""); // Reset the input field
-      fetchTasks();
     }
   };
 
@@ -45,10 +33,20 @@ function App() {
     setTodo(e.target.value);
   };
 
-  const handleToggleComplete = async (index) => {
-    const updatedTask = { ...Todos[index], isCompleted: !Todos[index].isCompleted };
-    await axios.put(`http://localhost:3000/api/tasks/${Todos[index]._id}`, updatedTask);
-    fetchTasks();
+  const handleToggleComplete = (index) => {
+    const newTodos = Todos.map((item, idx) => {
+      if (idx === index) {
+        return { ...item, isCompleted: !item.isCompleted };
+      }
+      return item;
+    });
+    setTodos(newTodos);
+  };
+
+  const handleEditSave = (index, newTodoText) => {
+    const updatedTodos = [...Todos];
+    updatedTodos[index] = { ...updatedTodos[index], Todo: newTodoText, editing: false };
+    setTodos(updatedTodos);
   };
 
   const getCompletionPercentage = () => {
@@ -64,7 +62,7 @@ function App() {
         <div className="addtodo">
           <h2 className="text-lg font-bold">Add Task</h2>
           <input onChange={HandleChange} value={Todo} type="text" className="w-1/2" />
-          <button onClick={HandleAdd} className="bg-slate-600 font-bold rounded-xl p-1 mx-1 hover:bg-slate-300 m-1 text-black">Add</button>
+          <button onClick={HandleAdd} className="bg-slate-600 rounded-xl p-1 mx-1 hover:bg-slate-300 m-1 text-black">Add</button>
         </div>
         
         <h2 className="text-lg font-bold">Your Tasks</h2>
@@ -73,26 +71,40 @@ function App() {
           {Todos.map((item, index) => (
             <div key={index} className="flex justify-start items-center my-2">
               <input type="checkbox" checked={item.isCompleted} onChange={() => handleToggleComplete(index)} className="mr-2" />
-              {editing === index ? (
+              {item.editing ? (
                 <input
                   type="text"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="w-1/2"
+                  value={item.Todo}
+                  onChange={(e) => {
+                    const updatedTodos = [...Todos];
+                    updatedTodos[index] = { ...item, Todo: e.target.value };
+                    setTodos(updatedTodos);
+                  }}
+                  onBlur={() => handleEditSave(index, item.Todo)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleEditSave(index, item.Todo);
+                    }
+                  }}
+                  className="form-control"
+                  autoFocus
                 />
               ) : (
-                <div className={item.isCompleted ? "line-through" : ""}>{item.name}</div>
+                <div className={item.isCompleted ? "line-through" : ""}>{item.Todo}</div>
               )}
               <div className="button ml-auto">
-                {editing === index ? (
-                  <button onClick={() => HandleEdit(index)} className="bg-slate-600 font-bold rounded-xl p-1 mx-1 hover:bg-slate-300 m-1">Save</button>
-                ) : (
-                  <button onClick={() => {
-                    setEditing(index);
-                    setEditText(item.name);
-                  }} className="bg-slate-600 font-bold rounded-xl p-1 mx-1 hover:bg-slate-300 m-1">Edit</button>
-                )}
-                <button onClick={() => HandleDelete(index)} className="bg-slate-600 font-bold rounded-xl p-1 mx-1 hover:bg-slate-300 m-1">Delete</button>
+                <button
+                  onClick={() => HandleEdit(index)}
+                  className="bg-slate-600 rounded-xl p-1 mx-1 hover:bg-slate-300 m-1"
+                >
+                  {item.editing ? "Save" : "Edit"}
+                </button>
+                <button
+                  onClick={() => HandleDelete(index)}
+                  className="bg-slate-600 rounded-xl p-1 mx-1 hover:bg-slate-300 m-1"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
